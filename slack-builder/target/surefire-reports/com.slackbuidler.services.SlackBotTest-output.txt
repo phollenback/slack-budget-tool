@@ -1,0 +1,6 @@
+⚠️ Warning: Attempted to post empty message to Slack - skipping
+Attempting to post message to Slack: Test message
+ERROR: Slack bot token is not configured!
+Attempting to post message to Slack: Valid test message
+ERROR: Slack bot token is not configured!
+⚠️ Warning: Attempted to post null message to Slack - skipping

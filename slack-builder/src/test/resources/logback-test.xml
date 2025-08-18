@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Test-specific logging configuration - Aggressive suppression -->
+    
+    <!-- Console appender for tests with minimal output -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%msg%n</pattern>
+        </encoder>
+        <!-- Only show WARN and ERROR messages -->
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>WARN</level>
+        </filter>
+    </appender>
+    
+    <!-- Set all loggers to WARN level to suppress debug and info -->
+    <logger name="org.springframework.test.util.ReflectionTestUtils" level="ERROR"/>
+    <logger name="org.springframework.test" level="ERROR"/>
+    <logger name="org.springframework" level="ERROR"/>
+    <logger name="org.apache.maven.surefire" level="ERROR"/>
+    <logger name="com.fasterxml.jackson" level="ERROR"/>
+    <logger name="com.slack.api" level="ERROR"/>
+    <logger name="org.junit" level="ERROR"/>
+    <logger name="org.junit.jupiter" level="ERROR"/>
+    
+    <!-- Set application logging to ERROR to reduce noise -->
+    <logger name="com.slackbuidler" level="ERROR"/>
+    
+    <!-- Root logger - only show errors -->
+    <root level="ERROR">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration> 

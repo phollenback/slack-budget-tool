@@ -1,0 +1,2 @@
+Error handling Slack event: Unrecognized token 'json': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')
+ at [Source: (String)"{"invalid": json}"; line: 1, column: 17]

@@ -1,0 +1,396 @@
+<div class="header">
+  <h1 class="welcome-title">Welcome to Budget Tracker</h1>
+  <div class="header-actions">
+    <button class="budget-planner-btn" (click)="openBudgetPlanner()" title="Open Budget Planner">
+      📊 Budget Planner
+    </button>
+  </div>
+</div>
+
+<div class="main-content">
+  <!-- Left Third - Recent Transactions Hub -->
+  <div class="transactions-hub">
+    <h2>Recent Transactions</h2>
+
+    <!-- Loading State -->
+    <div class="loading-state" *ngIf="isLoading">
+      <div class="loading-spinner-large"></div>
+      <p>Loading transactions...</p>
+    </div>
+
+    <!-- Error State -->
+    <div class="error-state" *ngIf="error && !isLoading">
+      <div class="error-icon">⚠️</div>
+      <p class="error-message">{{ error }}</p>
+      <button class="retry-btn" (click)="retryLoad()">Retry</button>
+    </div>
+
+    <!-- Transactions List -->
+    <div class="transaction-list" *ngIf="!isLoading && !error && allTransactions.length > 0">
+      <div class="transaction-item" *ngFor="let transaction of recentTransactions">
+        <div class="transaction-info">
+          <div class="transaction-vendor">
+            {{ transaction.vendor }}
+            <button class="edit-btn-small" (click)="startEdit(transaction)" title="Edit transaction">
+              ✏️
+            </button>
+          </div>
+          <div class="transaction-category">{{ transaction.category || 'Uncategorized' }}</div>
+          <div class="transaction-notes" *ngIf="transaction.notes">{{ transaction.notes }}</div>
+        </div>
+        <div class="transaction-amount"
+             [class.purchase]="transaction.type === 'purchase'"
+             [class.refund]="transaction.type === 'refund'"
+             [class.expense]="transaction.type === 'expense'"
+             [class.income]="transaction.type === 'income'"
+             [class.transfer]="transaction.type === 'transfer'"
+             [class.other]="transaction.type === 'other'">
+          {{ getTransactionSymbol(transaction.type) }}{{ transaction.amount | currency }}
+        </div>
+        <div class="transaction-date">{{ transaction.date | date:'shortDate' }}</div>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div class="empty-state" *ngIf="!isLoading && !error && allTransactions.length === 0">
+      <div class="empty-icon">📊</div>
+      <p>No transactions found</p>
+      <p class="empty-subtitle">Start adding transactions to see them here</p>
+    </div>
+
+    <!-- Pagination Controls -->
+    <div class="pagination-controls" *ngIf="!isLoading && !error && allTransactions.length > 0 && totalPages > 1">
+      <div class="pagination-info">
+        Page {{ currentPage }} of {{ totalPages }}
+      </div>
+      <div class="pagination-buttons">
+        <div class="page-numbers">
+          <!-- Ellipsis before current range -->
+          <button
+            *ngIf="showEllipsisBefore"
+            class="page-number ellipsis-btn"
+            (click)="goToPage(ellipsisBeforePage)"
+            title="Jump to page {{ ellipsisBeforePage }}">
+            ...
+          </button>
+
+          <!-- Page numbers -->
+          <button
+            *ngFor="let page of pageNumbers"
+            class="page-number"
+            [class.active]="isCurrentPage(page)"
+            (click)="goToPage(page)">
+            {{ page }}
+          </button>
+
+          <!-- Ellipsis after current range -->
+          <button
+            *ngIf="showEllipsisAfter"
+            class="page-number ellipsis-btn"
+            (click)="goToPage(ellipsisAfterPage)"
+            title="Jump to page {{ ellipsisAfterPage }}">
+            ...
+          </button>
+        </div>
+
+        <button
+          class="pagination-btn next-btn"
+          (click)="goToNextPage()"
+          [disabled]="currentPage === totalPages">
+          Next →
+        </button>
+      </div>
+    </div>
+
+    <div class="view-all-link">
+      <a href="#" (click)="viewAllTransactions($event)">View All Transactions →</a>
+    </div>
+  </div>
+
+  <!-- Edit Transaction Modal -->
+  <div class="edit-modal" *ngIf="editingTransaction" (click)="cancelEdit()">
+    <div class="edit-modal-content" (click)="$event.stopPropagation()">
+      <div class="edit-modal-header">
+        <h3>Edit Transaction</h3>
+        <button class="close-btn" (click)="cancelEdit()">×</button>
+      </div>
+
+      <div class="edit-form">
+        <div class="edit-field">
+          <label for="category-select">Category:</label>
+          <select
+            id="category-select"
+            [(ngModel)]="editingTransaction!.category"
+            class="edit-select"
+            aria-label="Transaction category">
+            <option value="">Select a category</option>
+            <option *ngFor="let category of availableCategories" [value]="category">
+              {{ category }}
+            </option>
+          </select>
+        </div>
+
+        <div class="edit-field">
+          <label for="notes-input">Notes:</label>
+          <textarea
+            id="notes-input"
+            [(ngModel)]="editingTransaction!.notes"
+            class="edit-textarea"
+            placeholder="Add notes about this transaction"
+            rows="3"></textarea>
+        </div>
+
+        <div class="edit-actions">
+          <button class="save-btn" (click)="saveEdit()" [disabled]="isLoading">
+            {{ isLoading ? 'Saving...' : 'Save Changes' }}
+          </button>
+          <button class="cancel-btn" (click)="cancelEdit()" [disabled]="isLoading">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right 2/3 - Charts Section -->
+  <div class="charts-section">
+    <div class="chart-header">
+      <h2>{{ getSpendingOverviewTitle() }}</h2>
+      <div class="chart-controls">
+        <!-- Unified Control Puck for Time Frame and Chart Type -->
+        <div class="control-puck">
+          <div class="puck-section time-frame-section">
+            <label class="puck-label">Time Frame</label>
+            <div class="puck-buttons">
+              <button
+                class="puck-btn"
+                [class.active]="timeFrame === 'week'"
+                (click)="setTimeFrame('week')"
+                [disabled]="isTimeFrameLoading"
+                title="Last 7 days">
+                <span *ngIf="isTimeFrameLoading && timeFrame === 'week'" class="loading-spinner-small"></span>
+                <span *ngIf="!(isTimeFrameLoading && timeFrame === 'week')">W</span>
+              </button>
+              <button
+                class="puck-btn"
+                [class.active]="timeFrame === 'month'"
+                (click)="setTimeFrame('month')"
+                [disabled]="isTimeFrameLoading"
+                title="Last 30 days">
+                <span *ngIf="isTimeFrameLoading && timeFrame === 'month'" class="loading-spinner-small"></span>
+                <span *ngIf="!(isTimeFrameLoading && timeFrame === 'month')">M</span>
+              </button>
+              <button
+                class="puck-btn"
+                [class.active]="timeFrame === 'year'"
+                (click)="setTimeFrame('year')"
+                [disabled]="isTimeFrameLoading"
+                title="Last 365 days">
+                <span *ngIf="isTimeFrameLoading && timeFrame === 'year'" class="loading-spinner-small"></span>
+                <span *ngIf="!(isTimeFrameLoading && timeFrame === 'year')">Y</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="puck-divider"></div>
+
+          <div class="puck-section chart-type-section">
+            <label class="puck-label">Chart Type</label>
+            <div class="puck-buttons">
+              <button
+                class="puck-btn"
+                [class.active]="chartType === 'pie'"
+                (click)="setChartType('pie')">
+                Pie
+              </button>
+              <button
+                class="puck-btn"
+                [class.active]="chartType === 'bar'"
+                (click)="setChartType('bar')">
+                Bar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="isTimeFrameLoading" class="time-frame-loading">
+          <small style="color: #667eea;">🔄 Loading data from backend...</small>
+        </div>
+
+        <div class="control-group budget-selector">
+          <label class="control-label" for="budget-filter">Budget Filter</label>
+          <select
+            id="budget-filter"
+            [(ngModel)]="selectedBudgetId"
+            (change)="onBudgetChange()"
+            class="budget-dropdown">
+            <option value="">All Budgets</option>
+            <option
+              *ngFor="let budget of availableBudgets"
+              [value]="budget.id">
+              {{ budget.name }}
+            </option>
+          </select>
+        </div>
+
+
+      </div>
+    </div>
+
+    <div class="chart-container">
+      <!-- Chart Canvas -->
+      <div class="chart-wrapper">
+        <canvas #chartCanvas></canvas>
+      </div>
+
+      <!-- No Data Message -->
+      <div class="no-data-message" *ngIf="categoryData.length === 0">
+        <div class="no-data-icon">📊</div>
+        <h4>No spending data for {{ getTimeFrameDescription() }}</h4>
+        <p>There are no spending transactions in the selected time period.</p>
+        <p class="no-data-tip">Try selecting a different time frame or add some transactions.</p>
+
+        <!-- Sample Data Suggestions -->
+        <div class="sample-suggestions" *ngIf="getSampleDataSuggestions().length > 0">
+          <h5>💡 Suggestions for {{ timeFrame.toUpperCase() }}:</h5>
+          <ul class="suggestion-list">
+            <li *ngFor="let suggestion of getSampleDataSuggestions()">{{ suggestion }}</li>
+          </ul>
+        </div>
+
+        <div class="time-frame-info">
+          <small>Current time frame: {{ timeFrame.toUpperCase() }} ({{ getTimeFrameDescription() }})</small>
+          <br>
+          <small *ngIf="getTransactionDateRange().earliest">
+            Available transactions: {{ getTransactionDateRange().earliest }} to {{ getTransactionDateRange().latest }}
+          </small>
+          <br>
+          <small class="data-summary">{{ getDataStateSummary() }}</small>
+          <br>
+
+        </div>
+      </div>
+
+      <!-- Spending Summary -->
+      <div class="spending-summary" *ngIf="categoryData.length > 0">
+        <div class="summary-header">
+          <h4>Spending Summary ({{ timeFrame.toUpperCase() }})</h4>
+          <div class="total-spending">
+            Total: {{ totalSpending | currency }}
+          </div>
+        </div>
+
+        <div class="category-breakdown">
+          <div class="category-item"
+               *ngFor="let category of categoryData; let i = index"
+               [class.selected]="selectedCategory === category.category"
+               [class.expanded]="isCategoryExpanded(category.category)"
+               [title]="'Click to expand ' + category.category + ' details'">
+            <div class="category-header" (click)="toggleCategoryExpansion(category.category)">
+              <div class="category-info">
+                <span class="category-name">{{ category.category }}</span>
+                <span class="category-count">({{ category.count }} transactions)</span>
+              </div>
+              <div class="category-amount">
+                {{ category.total | currency }}
+                <span class="category-percentage">({{ category.percentage.toFixed(1) }}%)</span>
+              </div>
+              <div class="expand-icon">
+                <span class="expand-arrow" [class.expanded]="isCategoryExpanded(category.category)">▼</span>
+              </div>
+            </div>
+
+            <!-- Dropdown content -->
+            <div class="category-dropdown"
+                 [class.expanded]="isCategoryExpanded(category.category)"
+                 [@slideDown]="isCategoryExpanded(category.category)">
+              <div class="dropdown-transactions">
+                <!-- For yearly view, show transactions by month -->
+                <div *ngIf="timeFrame === 'year' && category.transactions" class="monthly-transactions">
+                  <div class="dropdown-transaction"
+                       *ngFor="let transaction of category.transactions">
+                    <div class="dropdown-transaction-info">
+                      <div class="dropdown-vendor">{{ transaction.vendor }}</div>
+                      <div class="dropdown-notes" *ngIf="transaction.notes">{{ transaction.notes }}</div>
+                      <div class="dropdown-date">{{ transaction.date | date:'shortDate' }}</div>
+                    </div>
+                    <div class="dropdown-amount">
+                      {{ transaction.amount | currency }}
+                    </div>
+                  </div>
+                </div>
+
+                <!-- For weekly/monthly view, show paginated category transactions -->
+                <div *ngIf="timeFrame !== 'year'" class="category-transactions">
+                  <div class="dropdown-transaction"
+                       *ngFor="let transaction of getPaginatedCategoryTransactions(category.category)">
+                    <div class="dropdown-transaction-info">
+                      <div class="dropdown-vendor">{{ transaction.vendor }}</div>
+                      <div class="dropdown-notes" *ngIf="transaction.notes">{{ transaction.notes }}</div>
+                      <div class="dropdown-date">{{ transaction.date | date:'shortDate' }}</div>
+                    </div>
+                    <div class="dropdown-amount">
+                      {{ transaction.amount | currency }}
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Dropdown Pagination (only for weekly/monthly view) -->
+                <div class="dropdown-pagination" *ngIf="timeFrame !== 'year' && getDropdownTotalPages(category.category) > 1">
+                  <div class="pagination-info">
+                    <div class="pagination-details">
+                      Showing {{ getCurrentPageTransactionsCount(category.category) }} of {{ getTotalTransactionsCount(category.category) }} transactions
+                    </div>
+                    <div class="pagination-pages">
+                      Page {{ getDropdownPage(category.category) }} of {{ getDropdownTotalPages(category.category) }}
+                    </div>
+                  </div>
+                  <div class="pagination-buttons">
+                    <button
+                      class="pagination-btn prev-btn"
+                      (click)="previousDropdownPage(category.category)"
+                      [disabled]="getDropdownPage(category.category) === 1">
+                      ← Previous
+                    </button>
+                    <button
+                      class="pagination-btn next-btn"
+                      (click)="nextDropdownPage(category.category)"
+                      [disabled]="getDropdownPage(category.category) === getDropdownTotalPages(category.category)">
+                      Next →
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category Details Section -->
+      <div class="category-details" *ngIf="selectedCategory">
+        <div class="details-header">
+          <h4>{{ selectedCategory }} Transactions</h4>
+          <button class="close-details-btn" (click)="clearCategorySelection()">×</button>
+        </div>
+
+        <div class="transaction-details">
+          <div class="detail-transaction" *ngFor="let transaction of filteredTransactions">
+            <div class="detail-transaction-info">
+              <div class="detail-vendor">{{ transaction.vendor }}</div>
+              <div class="detail-notes" *ngIf="transaction.notes">{{ transaction.notes }}</div>
+              <div class="detail-date">{{ transaction.date | date:'shortDate' }}</div>
+            </div>
+            <div class="detail-amount">
+              {{ transaction.amount | currency }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Help Text -->
+      <div class="help-text" *ngIf="!selectedCategory && categoryData.length > 0">
+        <p>💡 <strong>Tip:</strong> Click on any category above or on the chart to view detailed transactions</p>
+      </div>
+    </div>
+  </div>
+</div>

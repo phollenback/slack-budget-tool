@@ -1,0 +1,398 @@
+<div class="budget-planner">
+  <!-- Back Navigation -->
+  <div class="back-navigation">
+    <button class="back-btn" (click)="goBack()" title="Go back to home">
+      ← Back to Home
+    </button>
+  </div>
+
+  <!-- Budget Planner Header -->
+  <div class="planner-header">
+    <h2>Budget Planner</h2>
+    <button class="create-budget-btn" (click)="startCreateBudget()" *ngIf="!isCreatingBudget">
+      + Create Budget
+    </button>
+  </div>
+
+  <!-- Dashboard Summary Section -->
+  <div class="dashboard-summary" *ngIf="dashboardData && !isCreatingBudget">
+    <div class="summary-cards">
+      <div class="summary-card">
+        <div class="summary-icon">📊</div>
+        <div class="summary-content">
+          <h4>Total Budgets</h4>
+          <div class="summary-value">{{ dashboardData.summary.totalBudgets }}</div>
+        </div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-icon">💰</div>
+        <div class="summary-content">
+          <h4>Total Planned</h4>
+          <div class="summary-value">{{ dashboardData.summary.totalPlanned | currency }}</div>
+        </div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-icon">💸</div>
+        <div class="summary-content">
+          <h4>Total Spent</h4>
+          <div class="summary-value">{{ dashboardData.summary.totalSpent | currency }}</div>
+        </div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-icon">🎯</div>
+        <div class="summary-content">
+          <h4>Remaining</h4>
+          <div class="summary-value" [class.negative]="dashboardData.summary.totalRemaining < 0">
+            {{ dashboardData.summary.totalRemaining | currency }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Overall Progress Bar -->
+    <div class="overall-progress" *ngIf="dashboardData.summary.totalPlanned > 0">
+      <div class="progress-label">
+        <span>Overall Progress</span>
+        <span>{{ dashboardData.summary.overallSpentPercentage | number:'1.1-1' }}%</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill"
+             [style.width.%]="Math.min(dashboardData.summary.overallSpentPercentage, 100)"
+             [style.background-color]="getProgressBarColor(dashboardData.summary.overallSpentPercentage)">
+        </div>
+      </div>
+    </div>
+
+    <!-- Status Alerts -->
+    <div class="status-alerts" *ngIf="dashboardData.overBudgetBudgets.length > 0 || dashboardData.nearLimitBudgets.length > 0">
+      <div class="alert over-budget" *ngIf="dashboardData.overBudgetBudgets.length > 0">
+        <span class="alert-icon">⚠️</span>
+        <span class="alert-text">{{ dashboardData.overBudgetBudgets.length }} budget(s) over limit</span>
+      </div>
+      <div class="alert near-limit" *ngIf="dashboardData.nearLimitBudgets.length > 0">
+        <span class="alert-icon">⚡</span>
+        <span class="alert-text">{{ dashboardData.nearLimitBudgets.length }} budget(s) near limit</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div class="loading-state" *ngIf="isLoading">
+    <div class="loading-spinner"></div>
+    <p>Loading budget data...</p>
+  </div>
+
+  <!-- Error State -->
+  <div class="error-state" *ngIf="errorMessage && !isLoading">
+    <div class="error-icon">❌</div>
+    <p>{{ errorMessage }}</p>
+    <button class="retry-btn" (click)="loadDashboard()">Retry</button>
+  </div>
+
+  <!-- Budgets List - 3x1 Container Layout -->
+  <div class="budgets-container" *ngIf="!isCreatingBudget && !isLoading && !errorMessage">
+    <div class="budgets-grid" *ngIf="budgets.length > 0">
+      <div class="budget-card"
+           *ngFor="let budget of budgets; trackBy: trackBudgetById"
+           (click)="selectBudget(budget)"
+           [class.selected]="currentBudget?.id === budget.id">
+
+        <!-- Budget Status Indicator -->
+        <div class="budget-status" [style.background-color]="getStatusColor(budget.status)">
+          <span class="status-icon">{{ getStatusIcon(budget.status) }}</span>
+        </div>
+
+        <div class="budget-info">
+          <h4 class="budget-name">{{ budget.name || 'Unnamed Budget' }}</h4>
+          <p class="budget-dates" *ngIf="budget.startDate && budget.endDate">
+            {{ budget.startDate | date:'shortDate' }} - {{ budget.endDate | date:'shortDate' }}
+          </p>
+
+          <!-- Budget Status Badge -->
+          <span class="status-badge" [style.background-color]="getStatusColor(budget.status)">
+            {{ budget.status | titlecase }}
+          </span>
+        </div>
+
+        <div class="budget-summary">
+          <div class="budget-amounts">
+            <span class="planned" *ngIf="budget.totalPlanned !== undefined">
+              Planned: {{ budget.totalPlanned | currency }}
+            </span>
+            <span class="spent" *ngIf="budget.totalSpent !== undefined">
+              Spent: {{ budget.totalSpent | currency }}
+            </span>
+            <span class="remaining" *ngIf="budget.totalRemaining !== undefined">
+              Remaining: {{ budget.totalRemaining | currency }}
+            </span>
+          </div>
+
+          <!-- Progress Bar -->
+          <div class="budget-progress" *ngIf="budget.totalPlanned && budget.totalPlanned > 0">
+            <div class="progress-bar">
+              <div class="progress-fill"
+                   [style.width.%]="Math.min(budget.spentPercentage, 100)"
+                   [style.background-color]="getProgressBarColor(budget.spentPercentage)">
+              </div>
+            </div>
+            <span class="progress-text">{{ budget.spentPercentage | number:'1.1-1' }}%</span>
+          </div>
+
+          <!-- Category Summary -->
+          <div class="category-summary" *ngIf="budget.categories && budget.categories.length > 0">
+            <span class="category-count">{{ budget.totalCategories }} categories</span>
+            <span class="over-budget-count" *ngIf="budget.overBudgetCategories > 0"
+                  [style.color]="getStatusColor('over-budget')">
+              {{ budget.overBudgetCategories }} over
+            </span>
+            <span class="near-limit-count" *ngIf="budget.nearLimitCategories > 0"
+                  [style.color]="getStatusColor('near-limit')">
+              {{ budget.nearLimitCategories }} near limit
+            </span>
+          </div>
+
+          <button class="delete-btn"
+                  (click)="deleteBudget(budget.id); $event.stopPropagation()"
+                  title="Delete budget">🗑️</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- No Budgets Message -->
+    <div class="no-budgets" *ngIf="budgets.length === 0">
+      <div class="empty-icon">📊</div>
+      <h3>No Budgets Yet</h3>
+      <p>Create your first budget to start tracking your spending!</p>
+      <button class="create-first-btn" (click)="startCreateBudget()">Create Budget</button>
+    </div>
+  </div>
+
+  <!-- Selected Budget Details - Below the 3x1 Container -->
+  <div class="selected-budget-details" *ngIf="currentBudget && !isCreatingBudget">
+    <!-- Budget Overview Cards -->
+    <div class="budget-overview">
+      <div class="overview-card" *ngIf="currentBudget.totalPlanned !== undefined">
+        <h4>Total Planned</h4>
+        <div class="amount">{{ currentBudget.totalPlanned | currency }}</div>
+      </div>
+      <div class="overview-card" *ngIf="currentBudget.totalSpent !== undefined">
+        <h4>Total Spent</h4>
+        <div class="amount">{{ currentBudget.totalSpent | currency }}</div>
+      </div>
+      <div class="overview-card" *ngIf="currentBudget.totalRemaining !== undefined">
+        <h4>Remaining</h4>
+        <div class="amount" [class.negative]="currentBudget.totalRemaining < 0">
+          {{ currentBudget.totalRemaining | currency }}
+        </div>
+      </div>
+      <div class="overview-card">
+        <h4>Progress</h4>
+        <div class="amount">{{ currentBudget.spentPercentage | number:'1.1-1' }}%</div>
+      </div>
+      <div class="overview-card" *ngIf="currentBudget.dailySpendingAllowance !== undefined">
+        <h4>Daily Allowance</h4>
+        <div class="amount daily-allowance" [class.over-budget]="currentBudget.dailySpendingAllowance <= 0">
+          {{ currentBudget.formattedDailySpendingAllowance || getFormattedDailySpendingAllowance(currentBudget) }}
+        </div>
+      </div>
+      <div class="overview-card" *ngIf="currentBudget.daysRemaining !== undefined">
+        <h4>Days Left</h4>
+        <div class="amount days-remaining">{{ currentBudget.daysRemaining || getDaysRemaining(currentBudget) }}</div>
+      </div>
+    </div>
+
+    <!-- Overall Budget Progress -->
+    <div class="budget-progress-overview" *ngIf="currentBudget.totalPlanned && currentBudget.totalPlanned > 0">
+      <h4>Budget Progress</h4>
+      <div class="progress-container">
+        <div class="progress-bar">
+          <div class="progress-fill"
+               [style.width.%]="Math.min(currentBudget.spentPercentage, 100)"
+               [style.background-color]="getProgressBarColor(currentBudget.spentPercentage)">
+          </div>
+        </div>
+        <span class="progress-text">{{ currentBudget.spentPercentage | number:'1.1-1' }}% spent</span>
+      </div>
+    </div>
+
+    <!-- Categories List - Scrollable container -->
+    <div class="categories-container">
+      <h4>Category Breakdown ({{ currentBudget.totalCategories }})</h4>
+      <div class="categories-scroll-area">
+        <div class="category-card" *ngFor="let category of currentBudget.categories; trackBy: trackCategoryById">
+          <div class="category-header">
+            <h5>{{ category.name || 'Unnamed Category' }}</h5>
+            <span class="category-status" [style.background-color]="getStatusColor(category.status)">
+              {{ getStatusIcon(category.status) }}
+            </span>
+          </div>
+          <div class="category-content">
+            <div class="category-amounts">
+              <span class="planned" *ngIf="category.plannedAmount !== undefined">
+                Planned: {{ category.plannedAmount | currency }}
+              </span>
+              <span class="spent" *ngIf="category.spentAmount !== undefined">
+                Spent: {{ category.spentAmount | currency }}
+              </span>
+              <span class="remaining" *ngIf="category.remainingAmount !== undefined">
+                Remaining: {{ category.remainingAmount | currency }}
+              </span>
+            </div>
+
+            <!-- Category Progress Bar -->
+            <div class="category-progress" *ngIf="category.plannedAmount && category.plannedAmount > 0">
+              <div class="progress-bar">
+                <div class="progress-fill"
+                     [style.width.%]="Math.min(category.spentPercentage, 100)"
+                     [style.background-color]="getProgressBarColor(category.spentPercentage)">
+                </div>
+              </div>
+              <span class="progress-text">{{ category.spentPercentage | number:'1.1-1' }}%</span>
+            </div>
+
+            <div class="category-actions">
+              <button class="edit-btn" (click)="editCategory(category)">✏️</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Budget Overlay -->
+  <div class="create-overlay" *ngIf="isCreatingBudget">
+    <div class="create-modal">
+      <div class="create-header">
+        <h3>Create New Budget</h3>
+        <button class="close-btn" (click)="cancelCreateBudget()">×</button>
+      </div>
+
+      <div class="create-form">
+        <!-- Budget Name -->
+        <div class="form-group">
+          <label for="budget-name">Budget Name</label>
+          <input
+            type="text"
+            id="budget-name"
+            [(ngModel)]="newBudget.name"
+            placeholder="e.g., Monthly Budget, Vacation Fund"
+            required>
+        </div>
+
+        <!-- Date Range -->
+        <div class="form-row">
+          <div class="form-group">
+            <label for="start-date">Start Date</label>
+            <input
+              type="date"
+              id="start-date"
+              [(ngModel)]="newBudget.startDate"
+              required>
+          </div>
+
+          <div class="form-group">
+            <label for="end-date">End Date</label>
+            <input
+              type="date"
+              id="end-date"
+              [(ngModel)]="newBudget.endDate"
+              required>
+          </div>
+        </div>
+
+        <!-- Repeatable Options -->
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input
+              type="checkbox"
+              [(ngModel)]="newBudget.isRepeatable"
+              (change)="toggleRepeatable()">
+            <span>Make this a repeatable budget</span>
+          </label>
+        </div>
+
+        <div class="form-row" *ngIf="newBudget.isRepeatable">
+          <div class="form-group">
+            <label for="repeat-interval">Repeat Every</label>
+            <select id="repeat-interval" [(ngModel)]="newBudget.repeatInterval">
+              <option *ngFor="let interval of repeatIntervals" [value]="interval.value">
+                {{ interval.label }}
+              </option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="repeat-count">Number of Times</label>
+            <input
+              type="number"
+              id="repeat-count"
+              [(ngModel)]="newBudget.repeatCount"
+              min="1"
+              max="99"
+              placeholder="1">
+          </div>
+        </div>
+
+        <!-- Default Categories -->
+        <div class="form-group">
+          <label>Quick Add Categories</label>
+          <div class="default-categories">
+                          <button
+                type="button"
+                *ngFor="let category of defaultCategories"
+                (click)="addDefaultCategory(category)"
+                class="category-btn"
+                [disabled]="isCategoryAlreadyAdded(category)">
+                {{ category }}
+              </button>
+          </div>
+        </div>
+
+        <!-- Budget Categories -->
+        <div class="form-group" *ngIf="newBudget.categories && newBudget.categories.length > 0">
+          <label>Budget Categories ({{ newBudget.categories.length }})</label>
+          <div class="budget-categories">
+            <div class="budget-category" *ngFor="let category of newBudget.categories">
+              <div class="category-inputs">
+                <input
+                  type="text"
+                  [(ngModel)]="category.name"
+                  placeholder="Category name"
+                  class="category-name"
+                  required>
+                <input
+                  type="number"
+                  [(ngModel)]="category.plannedAmount"
+                  placeholder="Amount"
+                  class="category-amount"
+                  min="0"
+                  step="0.01"
+                  required>
+                <input
+                  type="color"
+                  [(ngModel)]="category.color"
+                  class="category-color"
+                  title="Category color">
+                <button
+                  type="button"
+                  (click)="removeCategory(category.id)"
+                  class="remove-category-btn"
+                  title="Remove category">×</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="form-actions">
+          <button type="button" (click)="cancelCreateBudget()" class="cancel-btn">Cancel</button>
+          <button type="button" (click)="createBudget()" class="create-btn"
+                  [disabled]="!newBudget.name || !newBudget.startDate || !newBudget.endDate || !newBudget.categories || newBudget.categories.length === 0">
+            Create Budget
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
