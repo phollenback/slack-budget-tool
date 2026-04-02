@@ -28,12 +28,12 @@ public class SlackBot {
     public void postMessage(String message, String channelId) {
         // Handle null and empty messages gracefully
         if (message == null) {
-            System.out.println("⚠️ Warning: Attempted to post null message to Slack - skipping");
+            System.out.println("Warning: skipped posting null message to Slack");
             return;
         }
         
         if (message.trim().isEmpty()) {
-            System.out.println("⚠️ Warning: Attempted to post empty message to Slack - skipping");
+            System.out.println("Warning: skipped posting empty message to Slack");
             return;
         }
         
@@ -91,7 +91,7 @@ public class SlackBot {
             if (responseCode == 200) {
                 // Check if Slack API actually succeeded
                 if (slackResponse.contains("\"ok\":true")) {
-                    System.out.println("✅ Message posted successfully to Slack!");
+                    System.out.println("Message posted successfully to Slack");
                 } else if (slackResponse.contains("\"ok\":false")) {
                     // Extract error details from Slack response
                     String errorMessage = "Unknown Slack API error";
@@ -102,32 +102,32 @@ public class SlackBot {
                             errorMessage = slackResponse.substring(errorStart, errorEnd);
                         }
                     }
-                    System.err.println("❌ Slack API failed: " + errorMessage);
+                    System.err.println("Slack API failed: " + errorMessage);
                     System.err.println("Full response: " + slackResponse);
                     
                     // Log specific error details
                     if (slackResponse.contains("invalid_auth")) {
-                        System.err.println("🔐 Authentication failed - check your bot token");
+                        System.err.println("Authentication failed — verify bot token");
                     } else if (slackResponse.contains("unknown_method")) {
-                        System.err.println("🔧 API method not found - check the endpoint URL");
+                        System.err.println("API method not found — verify endpoint URL");
                     } else if (slackResponse.contains("channel_not_found")) {
-                        System.err.println("📢 Channel not found - check your channel ID");
+                        System.err.println("Channel not found — verify channel ID");
                     } else if (slackResponse.contains("missing_scope")) {
-                        System.err.println("🔑 Missing permissions - check your bot's OAuth scopes");
+                        System.err.println("Missing OAuth scopes for this call");
                     } else if (slackResponse.contains("cannot_dm_user")) {
-                        System.err.println("💬 Cannot DM user - user may have DMs disabled or bot lacks permissions");
+                        System.err.println("Cannot DM user (DMs disabled or missing permission)");
                     }
                 } else {
-                    System.err.println("⚠️ Unexpected Slack API response format");
+                    System.err.println("Unexpected Slack API response format");
                     System.err.println("Response: " + slackResponse);
                 }
             } else {
-                System.err.println("❌ HTTP request failed. Response code: " + responseCode);
+                System.err.println("HTTP request failed. Response code: " + responseCode);
                 System.err.println("Error response: " + slackResponse);
             }
             
         } catch (Exception e) {
-            System.err.println("❌ Error posting message to Slack: " + e.getMessage());
+            System.err.println("Error posting message to Slack: " + e.getMessage());
             e.printStackTrace();
         }
     }
