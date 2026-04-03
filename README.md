@@ -3,7 +3,9 @@ slack-budget-tool
 
 What it is
 ----------
-Spring Boot backend ("slack-builder") for budgets and spending: REST APIs for budgets and transactions, PostgreSQL persistence via JPA, and a Slack-driven flow so users can log purchases through messages. The app stores transactions through the existing service/DAO layer. Users log expenses directly via Slack messages using a structured workflow:
+Built a full-stack budgeting application with a Spring Boot backend and Angular frontend, enabling users to manage budgets and log transactions through both a web interface and Slack integration.
+
+Exposed REST APIs for budgets and transactions, with PostgreSQL persistence via JPA. Implemented a Slack-driven workflow allowing users to log expenses directly through messages:
 
 	User submits an expense message → prompted for category and cost
 	•	Application processes the input, validates data, and persists the transaction via the service/DAO layer
